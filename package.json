@@ -1,0 +1,50 @@
+{
+  "name": "@unicly/core",
+  "description": "Core contracts for the unicly protocol",
+  "version": "1.0.0",
+  "homepage": "https://unic.ly",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uniclyNFT/unicly-core.git"
+  },
+  "keywords": [
+    "uniswap",
+    "ethereum",
+    "unicly"
+  ],
+  "files": [
+    "contracts",
+    "build"
+  ],
+  "engines": {
+    "node": ">=10"
+  },
+  "scripts": {
+    "precompile": "rimraf ./build/",
+    "compile": "waffle",
+    "pretest": "yarn compile",
+    "test": "mocha",
+    "lint": "prettier ./test/**/*.ts --check",
+    "prepublishOnly": "yarn test"
+  },
+  "devDependencies": {
+    "@openzeppelin/contracts": "^3.1.0",
+    "@openzeppelin/test-helpers": "^0.5.6",
+    "@types/chai": "^4.2.12",
+    "@types/mocha": "^8.0.3",
+    "@uniswap/v2-core": "^1.0.1",
+    "chai": "^4.2.0",
+    "ethereum-waffle": "^3.1.0",
+    "ethereumjs-util": "^7.0.4",
+    "mocha": "^8.1.3",
+    "prettier": "^2.1.1",
+    "rimraf": "^3.0.2",
+    "solc": "0.6.12",
+    "truffle": "^5.1.41",
+    "truffle-flattener": "^1.4.4",
+    "ts-node": "^9.0.0",
+    "typescript": "^4.0.2",
+    "truffle-hdwallet-provider": "^1.0.17"
+  },
+  "license": "MIT"
+}
