@@ -10,6 +10,7 @@ import MockERC20 from '../build/MockERC20.json'
 import UnicFactory from '../build/UnicFactory.json'
 import Converter from '../build/Converter.json'
 import MockERC721 from '../build/MockERC721.json'
+import LockedLP from '../build/LockedLP.json'
 
 chai.use(solidity)
 
@@ -37,6 +38,7 @@ describe('UnicFarm', () => {
   let farm: Contract
   let lp: Contract
   let lp2: Contract
+  let lockedLP: Contract
 
   beforeEach(async () => {
     const fixture = await loadFixture(governanceFixture)
@@ -57,10 +59,64 @@ describe('UnicFarm', () => {
     // 195,000 blocks per tranche, mint rate is decreased by 4/5 each tranche
     farm = await deployContract(alice, UnicFarm, [unic.address, dev.address, 4, 5, 100, 100, 195000], overrides)
     await unic.connect(alice).transferOwnership(farm.address)
+    lockedLP = await deployContract(alice, LockedLP, [unic.address, farm.address], overrides)
 
     expect(await farm.unic()).to.be.eq(unic.address)
     expect(await farm.devaddr()).to.be.eq(dev.address)
     expect(await unic.owner()).to.be.eq(farm.address)
+    expect(await lockedLP.unic()).to.be.eq(unic.address)
+    expect(await lockedLP.farm()).to.be.eq(farm.address)
+  })
+
+  it('locked LP test', async () => {
+    // 100 UNIC minted per block, start block is at 100
+    // 195,000 blocks per tranche, mint rate is decreased by 4/5 each tranche
+    farm = await deployContract(alice, UnicFarm, [unic.address, dev.address, 4, 5, 100, 100, 195000], overrides)
+    await unic.connect(alice).transferOwnership(farm.address)
+    lockedLP = await deployContract(alice, LockedLP, [unic.address, farm.address], overrides)
+
+    await expect(lockedLP.connect(bob).setPoolCreator(lp.address, bob.address)).to.be.revertedWith('Ownable: caller is not the owner')
+    await lockedLP.connect(alice).setPoolCreator(lp.address, alice.address)
+    expect(await lockedLP.poolCreators(lp.address)).to.be.eq(alice.address)
+    expect(await lockedLP.pairs(alice.address)).to.be.eq(lp.address)
+    await expect(lockedLP.connect(alice).setPoolCreator(lp.address, alice.address)).to.be.revertedWith('LockedLP: Pool creator already set')
+
+    await expect(lockedLP.connect(bob).lock(lp.address, 100, 100000000000)).to.be.revertedWith('LockedLP: Pool creator only')
+    await expect(lockedLP.connect(alice).lock(lp.address, 100, 0)).to.be.revertedWith('LockedLP: Unlock must be in future')
+
+    await lp.connect(alice).approve(lockedLP.address, 1000)
+    let currentBlock = await provider.getBlock('latest')
+    let unlockTime = currentBlock.timestamp + 5
+    await lockedLP.connect(alice).lock(lp.address, 100, unlockTime)
+
+    currentBlock = await provider.getBlock('latest')
+
+    expect(await lp.balanceOf(lockedLP.address)).to.be.eq(100)
+    expect(await lp.balanceOf(alice.address)).to.be.eq(900)
+    expect((await lockedLP.locks(lp.address))[0]).to.be.eq(100)
+    expect((await lockedLP.locks(lp.address))[1]).to.be.eq(unlockTime)
+
+    await lockedLP.connect(alice).lock(lp.address, 100, unlockTime)
+    expect(await lp.balanceOf(lockedLP.address)).to.be.eq(200)
+    expect(await lp.balanceOf(alice.address)).to.be.eq(800)
+    expect((await lockedLP.locks(lp.address))[0]).to.be.eq(200)
+    expect((await lockedLP.locks(lp.address))[1]).to.be.eq(unlockTime)
+
+    await expect(lockedLP.connect(alice).unlock(lp.address)).to.be.revertedWith('LockedLP: You have not reached the unlock date')
+
+    await mineBlock(provider, (unlockTime+1))
+    await expect(lockedLP.connect(bob).unlock(lp.address)).to.be.revertedWith('LockedLP: Pool creator only')
+
+    await expect(lockedLP.connect(alice).lock(lp.address, 100, 100000000000)).to.be.revertedWith('LockedLP: Already past unlock date')
+
+    await lockedLP.connect(alice).unlock(lp.address)
+    expect(await lp.balanceOf(lockedLP.address)).to.be.eq(0)
+    expect(await lp.balanceOf(alice.address)).to.be.eq(1000)
+    expect((await lockedLP.locks(lp.address))[0]).to.be.eq(0)
+    expect((await lockedLP.locks(lp.address))[1]).to.be.eq(unlockTime)
+    await lockedLP.connect(alice).unlock(lp.address)
+    expect(await lp.balanceOf(lockedLP.address)).to.be.eq(0)
+    expect(await lp.balanceOf(alice.address)).to.be.eq(1000)
   })
 
   it('should allow dev and only dev to update dev', async () => {
@@ -137,6 +193,45 @@ describe('UnicFarm', () => {
     expect(await unic.balanceOf(dev.address)).to.be.eq(50)
     // Total supply should be Leia's token plus newly minted tokens
     expect(await unic.totalSupply()).to.be.eq(expandTo18Decimals(1).add(BigNumber.from(500)))
+
+    lockedLP = await deployContract(alice, LockedLP, [unic.address, farm.address], overrides)
+    await lockedLP.connect(alice).setPoolCreator(lp.address, alice.address)
+    await lp.connect(alice).approve(lockedLP.address, 1000)
+
+    currentBlock = await provider.getBlock('latest')
+    let unlockTime = currentBlock.timestamp + 20
+
+    await lockedLP.connect(alice).lock(lp.address, 100, unlockTime)
+    await expect(lockedLP.connect(bob).stake(0)).to.be.revertedWith('LockedLP: Pool creator only')
+    currentBlock = await provider.getBlock('latest')
+    await lockedLP.connect(alice).stake(0)
+
+    currentBlock = await provider.getBlock('latest')
+    await mineBlocks(provider, (currentBlock.timestamp + 1), (110 - currentBlock.number))
+    expect(await lockedLP.staked(lp.address)).to.be.eq(100)
+    expect((await farm.userInfo(0, lockedLP.address))[0]).to.be.eq(100)
+    expect(await unic.balanceOf(lockedLP.address)).to.be.eq(0)
+    expect(await unic.balanceOf(alice.address)).to.be.eq(expandTo18Decimals(1))
+    expect(await lp.balanceOf(farm.address)).to.be.eq(200)
+
+    await lockedLP.connect(alice).stake(0)
+    expect(await lockedLP.staked(lp.address)).to.be.eq(100)
+    expect((await farm.userInfo(0, lockedLP.address))[0]).to.be.eq(100)
+    expect(await unic.balanceOf(lockedLP.address)).to.be.eq(0)
+    expect(await unic.balanceOf(alice.address)).to.be.eq(expandTo18Decimals(1).add(BigNumber.from(90)))
+    expect(await lp.balanceOf(farm.address)).to.be.eq(200)
+
+    await lockedLP.connect(alice).lock(lp.address, 100, unlockTime)
+    await lockedLP.connect(alice).stake(0)
+    await mineBlocks(provider, (currentBlock.timestamp + 21), (120 - currentBlock.number))
+    await expect(lockedLP.connect(alice).unlock(lp.address)).to.be.revertedWith('LockedLP: Unstake first')
+
+    await lockedLP.connect(alice).unstake(0)
+    expect(await lockedLP.staked(lp.address)).to.be.eq(0)
+    expect((await farm.userInfo(0, lockedLP.address))[0]).to.be.eq(0)
+    expect(await lp.balanceOf(lockedLP.address)).to.be.eq(200)
+    expect(await unic.balanceOf(lockedLP.address)).to.be.eq(0)
+    expect(await unic.balanceOf(alice.address)).to.be.eq(expandTo18Decimals(1).add(BigNumber.from(840)))
   })
 
   it('should not distribute UNIC if nobody deposits', async () => {
