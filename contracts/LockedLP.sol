@@ -50,7 +50,7 @@ contract LockedLP is Ownable {
         if (info.amount > 0) {
             require(getBlockTimestamp() < info.unlockDate, "LockedLP: Already past unlock date");
             IERC20(_pair).transferFrom(msg.sender, address(this), _amount);
-            info.amount += _amount;
+            info.amount = info.amount.add(_amount);
         }
         else {
             IERC20(_pair).transferFrom(msg.sender, address(this), _amount);
@@ -72,8 +72,8 @@ contract LockedLP is Ownable {
         (IERC20 lpToken, , , , ) = UnicFarm(farm).poolInfo(_pid);
         address pair = address(lpToken);
         require(pairs[msg.sender] == pair, "LockedLP: Pool creator only");
-        uint256 amount = (locks[pair]).amount - staked[pair];
-        staked[pair] += amount;
+        uint256 amount = (locks[pair]).amount.sub(staked[pair]);
+        staked[pair] = staked[pair].add(amount);
         uint256 balance = UnicFarm(farm).pendingUnic(_pid, address(this));
         if (amount > 0) {
             lpToken.approve(farm, amount);
