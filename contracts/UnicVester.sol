@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./UnicSwap/interfaces/IUnicSwapV2Factory.sol";
 import "./UnicSwap/interfaces/IUnicSwapV2Pair.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/math/Math.sol";
 
 contract UnicVester is Ownable {
     using SafeMath for uint256;
@@ -57,14 +58,8 @@ contract UnicVester is Ownable {
         Schedule storage vestingInfo = vestings[token];
         require(vestingInfo.start < vestingInfo.end, "UnicVester: Fully vested and swapped");
         uint256 currentTime = getBlockTimestamp();
-        uint256 timeVested = currentTime.sub(vestingInfo.start);
-        if(currentTime > vestingInfo.end) {
-            timeVested = vestingInfo.end.sub(vestingInfo.start);
-        }
-        uint256 amountVested = vestingInfo.amount.mul(timeVested).div(vestingInfo.end.sub(vestingInfo.start));
-        if (amountVested > IERC20(token).balanceOf(address(this))) {
-            amountVested = IERC20(token).balanceOf(address(this));
-        }
+        uint256 timeVested = Math.min(currentTime.sub(vestingInfo.start), vestingInfo.end.sub(vestingInfo.start));
+        uint256 amountVested = Math.min(vestingInfo.amount.mul(timeVested).div(vestingInfo.end.sub(vestingInfo.start)), IERC20(token).balanceOf(address(this)));
         vestingInfo.start = currentTime;
         if(vestingInfo.amount < amountVested) {
             vestingInfo.amount = 0;
