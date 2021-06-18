@@ -52,7 +52,7 @@ contract UnicVester is Ownable {
         vestingDuration = _vestingDuration;
     }
     
-    function swap(address token) public {
+    function swap(address token) onlyOwner public {
         require(msg.sender == tx.origin, "do not convert from contract");
 
         Schedule storage vestingInfo = vestings[token];
