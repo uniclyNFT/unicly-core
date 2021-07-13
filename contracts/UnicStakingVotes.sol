@@ -24,7 +24,8 @@ contract UnicStakingVotes is Ownable {
         stakingPoolContract = _stakingPoolContract;
     }
 
-    function getStakedUnicByNftOwner(address owner) external view returns (uint256 unicWithMultiplierSum) {
+    //returns the balance in staked UNIC with Multiplier 
+    function balanceOf(address owner) external view returns (uint256 unicWithMultiplierSum) {
         uint256 balanceOf = stakingNftContract.balanceOf(owner);
 
         unicWithMultiplierSum = 0; 
