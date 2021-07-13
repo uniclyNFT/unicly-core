@@ -3,12 +3,12 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IMintableCollection.sol";
 import "./interfaces/IRewardable.sol";
+import "./abstract/EmergencyWithdrawable.sol";
 import "./UnicStakingERC721.sol";
 
-contract UnicStaking is Ownable, IRewardable {
+contract UnicStaking is EmergencyWithdrawable, IRewardable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
