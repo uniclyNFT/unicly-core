@@ -38,6 +38,8 @@ describe.only('UnicStaking', () => {
     await unic.mint(minter.address, 100000000)
 
     nftCollection = await deployContract(alice, UnicStakingERC721, ['UnicStakingCollection', 'UNIC-721', 'https://721.unic.ly'], overrides)
+
+    // in fact the staking would not only work for UNIC only but also for xUNIC or any other desired ERC-20 token
     staking = await deployContract(alice, UnicStaking, [unic.address, nftCollection.address, 1, 100], overrides)
     stakingRewardManager = await deployContract(alice, UnicStakingRewardManager, [staking.address])
     uToken = await deployContract(alice, MockERC20, ['Sample uToken', 'uSAMPLE', 10000000000], overrides)

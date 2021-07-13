@@ -3,12 +3,12 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IMintableCollection.sol";
 import "./interfaces/IRewardable.sol";
+import "./abstract/EmergencyWithdrawable.sol";
 import "./UnicStakingERC721.sol";
 
-contract UnicStaking is Ownable, IRewardable {
+contract UnicStaking is EmergencyWithdrawable, IRewardable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -75,12 +75,12 @@ contract UnicStaking is Ownable, IRewardable {
     }
 
     constructor(
-        IERC20 _unic,
+        IERC20 _stakingToken,
         IMintableCollection _nftCollection,
         uint256 _nftStartId,
         uint256 _minStakeAmount
     ) public {
-        stakingToken = _unic;
+        stakingToken = _stakingToken;
         nftCollection = _nftCollection;
         nftStartId = _nftStartId;
         minStakeAmount = _minStakeAmount;
@@ -99,9 +99,9 @@ contract UnicStaking is Ownable, IRewardable {
     }
 
     /**
-     * @param amount Amount of unic tokens
+     * @param amount Amount of staking tokens
      * @param lockDays How many days the staker wants to lock
-     * @param rewardToken The desired reward token to stake the unic for (most likely a certain uToken)
+     * @param rewardToken The desired reward token to stake the tokens for (most likely a certain uToken)
      */
     function stake(uint256 amount, uint256 lockDays, address rewardToken)
         external
@@ -118,7 +118,7 @@ contract UnicStaking is Ownable, IRewardable {
 
         updateRewards(rewardToken);
 
-        // transfer the unic tokens into the staking pool
+        // transfer the staking tokens into the staking pool
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // now the data of the staker is persisted
