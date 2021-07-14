@@ -145,6 +145,8 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         emit Staked(msg.sender, rewardToken, nftStartId, amount, lockDays);
     }
 
+
+
     function withdraw(uint256 nftId) external {
         StakerInfo storage staker = stakes[nftId];
         require(address(staker.rewardToken) != address(0), "UnicStaking: No staker exists");
@@ -253,5 +255,11 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
     // returns the virtual amount after having a multiplier applied
     function virtualAmount(uint256 amount, uint256 multiplier) private view returns (uint256) {
         return amount.mul(multiplier.mul(DIV_PRECISION).div(100)).div(DIV_PRECISION);
+    }
+
+    // returns the stake with multiplier for an nftId
+    function getStakeWithMultiplier(uint256 nftId) external view returns (uint256 stakeWithMultiplier){
+        StakerInfo memory staker = stakes[nftId];
+        stakeWithMultiplier = virtualAmount(staker.amount, staker.multiplier);
     }
 }
