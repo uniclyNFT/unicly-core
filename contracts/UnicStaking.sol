@@ -109,11 +109,11 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
     {
         require(
             amount >= minStakeAmount,
-            "StakingPool: Amount must be greater than or equal to min stake amount"
+            "UnicStaking: Amount must be greater than or equal to min stake amount"
         );
         require(
             lockMultipliers[lockDays].exists,
-            "StakingPool: Invalid number of lock days specified"
+            "UnicStaking: Invalid number of lock days specified"
         );
 
         updateRewards(rewardToken);
