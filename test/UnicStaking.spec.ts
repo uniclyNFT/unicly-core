@@ -15,7 +15,7 @@ const overrides = {
   gasLimit: 9999999
 }
 
-describe.only('UnicStaking', () => {
+describe('UnicStaking', () => {
   const provider = new MockProvider({
     ganacheOptions: {
       hardfork: 'istanbul',
