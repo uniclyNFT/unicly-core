@@ -145,8 +145,6 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         emit Staked(msg.sender, rewardToken, nftStartId, amount, lockDays);
     }
 
-
-
     function withdraw(uint256 nftId) external {
         StakerInfo storage staker = stakes[nftId];
         require(address(staker.rewardToken) != address(0), "UnicStaking: No staker exists");
