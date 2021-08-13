@@ -142,7 +142,7 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         nftStartId = nftStartId.add(1);
         nftCollection.mint(msg.sender, nftStartId - 1);
 
-        emit Staked(msg.sender, rewardToken, nftStartId, amount, lockDays);
+        emit Staked(msg.sender, rewardToken, nftStartId - 1, amount, lockDays);
     }
 
     function withdraw(uint256 nftId) external {
@@ -173,6 +173,8 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         pool.stakedAmount = pool.stakedAmount.sub(staker.amount);
         pool.stakedAmountWithMultipliers = pool.stakedAmountWithMultipliers.sub(virtualAmount);
 
+        uint256 staked = staker.amount;
+
         // reset all staker props
         staker.rewardDebt = 0;
         staker.amount = 0;
@@ -181,10 +183,10 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         staker.nftId = 0;
         staker.rewardToken = address(0);
 
-        stakingToken.safeTransfer(msg.sender, reward.add(staker.amount));
+        stakingToken.safeTransfer(msg.sender, reward.add(staked));
 
         emit Harvest(msg.sender, address(staker.rewardToken), nftId, reward);
-        emit Withdraw(msg.sender, address(staker.rewardToken), nftId, staker.amount);
+        emit Withdraw(msg.sender, address(staker.rewardToken), nftId, staked);
     }
 
     function updateRewards(address rewardToken) private poolExists(rewardToken) {

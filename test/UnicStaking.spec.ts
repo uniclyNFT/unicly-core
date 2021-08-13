@@ -15,7 +15,7 @@ const overrides = {
   gasLimit: 9999999
 }
 
-describe('UnicStaking', () => {
+describe.only('UnicStaking', () => {
   const provider = new MockProvider({
     ganacheOptions: {
       hardfork: 'istanbul',
@@ -23,7 +23,7 @@ describe('UnicStaking', () => {
       gasLimit: 99999999,
     },
   })
-  const [alice, nonOwner, minter, stakerHarold, stakerWilly] = provider.getWallets()
+  const [alice, nonOwner, minter, stakerHarold, stakerWilly, stakerJon] = provider.getWallets()
   const loadFixture = createFixtureLoader([alice], provider)
 
   let unic: Contract
@@ -125,5 +125,35 @@ describe('UnicStaking', () => {
     await unic.connect(stakerWilly).approve(staking.address, 1000);
     await staking.connect(stakerHarold).stake(500, 30, uToken.address);
     await staking.connect(stakerWilly).stake(1000, 0, uToken.address);
+  });
+
+  it('should return funds on withdrawal', async () => {
+    await staking.createPool(uToken.address);
+    await staking.setMinStakeAmount(100);
+    await staking.setLockMultiplier(0, 100);
+    await unic.transfer(stakerJon.address, 1000);
+
+    let balance = (await unic.balanceOf(stakerJon.address)).toString();
+    expect(balance).to.equal('1000');
+
+    await unic.connect(stakerJon).approve(staking.address, 1000);
+    const staked = await staking.connect(stakerJon).stake(1000, 0, uToken.address);
+    const stakedReceipt = await staked.wait();
+
+    balance = (await unic.balanceOf(stakerJon.address)).toString();
+    expect(balance).to.equal('0');
+
+    const stakedEvent = stakedReceipt.events.find((e: any) => e.event === 'Staked');
+    const stakingNftId = stakedEvent.args.nftId;
+
+    const currentBlock = await provider.getBlock('latest')
+    await mineBlocks(provider, (currentBlock.timestamp + 1), currentBlock.number + 1);
+
+    await nftCollection.connect(stakerJon).approve(staking.address, stakingNftId);
+    const withdrawn = await staking.connect(stakerJon).withdraw(stakingNftId)
+    await withdrawn.wait();
+
+    balance = (await unic.balanceOf(stakerJon.address)).toString();
+    expect(balance).to.equal('1000');
   });
 });
