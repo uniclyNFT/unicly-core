@@ -248,7 +248,16 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         RewardPool memory pool = pools[address(staker.rewardToken)];
         require(address(pool.rewardToken) != address(0), "UnicStaking: Pool gone");
 
-        uint256 accumulated = virtualAmount(staker.amount, staker.multiplier).mul(pool.accRewardPerShare).div(DIV_PRECISION);
+        uint256 accRewardPerShare = 0;
+        // run a part from the updateRewards logic but don't persist anything
+        if (pool.totalRewardAmount > pool.lastRewardAmount) {
+            if (pool.stakedAmountWithMultipliers > 0) {
+                uint256 reward = pool.totalRewardAmount.sub(pool.lastRewardAmount);
+                accRewardPerShare = pool.accRewardPerShare.add(reward.mul(DIV_PRECISION).div(pool.stakedAmountWithMultipliers));
+            }
+        }
+
+        uint256 accumulated = virtualAmount(staker.amount, staker.multiplier).mul(accRewardPerShare).div(DIV_PRECISION);
         return accumulated.sub(staker.rewardDebt);
     }
 

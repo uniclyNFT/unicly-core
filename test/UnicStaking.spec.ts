@@ -120,11 +120,41 @@ describe.only('UnicStaking', () => {
 
     await unic.transfer(stakerHarold.address, 1000);
     await unic.transfer(stakerWilly.address, 1000);
+    await unic.transfer(stakerJon.address, 1000);
 
     await unic.connect(stakerHarold).approve(staking.address, 500);
     await unic.connect(stakerWilly).approve(staking.address, 1000);
-    await staking.connect(stakerHarold).stake(500, 30, uToken.address);
-    await staking.connect(stakerWilly).stake(1000, 0, uToken.address);
+    await unic.connect(stakerJon).approve(staking.address, 750);
+
+    const stakedHarold = await staking.connect(stakerHarold).stake(500, 30, uToken.address);
+    const stakedHaroldReceipt = await stakedHarold.wait();
+    const haroldEvent = stakedHaroldReceipt.events.find((e: any) => e.event === 'Staked');
+    const haroldNftId = haroldEvent.args.nftId;
+
+    const stakedWilly = await staking.connect(stakerWilly).stake(1000, 0, uToken.address);
+    const stakedWillyReceipt = await stakedWilly.wait();
+    const willyEvent = stakedWillyReceipt.events.find((e: any) => e.event === 'Staked');
+    const willyNftId = willyEvent.args.nftId;
+
+    const stakedJon = await staking.connect(stakerJon).stake(750, 0, uToken.address);
+    const stakedJonReceipt = await stakedJon.wait();
+    const jonEvent = stakedJonReceipt.events.find((e: any) => e.event === 'Staked');
+    const jonNftId = jonEvent.args.nftId;
+
+    await uToken.approve(staking.address, 1000);
+    await staking.addRewards(uToken.address, 1000);
+
+    const currentBlock = await provider.getBlock('latest')
+    await mineBlocks(provider, (currentBlock.timestamp + 1), currentBlock.number + 1);
+
+    const pendingRewardHarold = (await staking.pendingReward(haroldNftId)).toString();
+    expect(pendingRewardHarold).to.equal('255'); // 500 staked with multiplier count as 600
+
+    const pendingRewardWilly = (await staking.pendingReward(willyNftId)).toString();
+    expect(pendingRewardWilly).to.equal('425');
+
+    const pendingRewardJon = (await staking.pendingReward(jonNftId)).toString();
+    expect(pendingRewardJon).to.equal('319');
   });
 
   it('should return funds on withdrawal', async () => {
