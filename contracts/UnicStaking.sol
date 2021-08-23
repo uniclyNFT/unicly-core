@@ -142,10 +142,8 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         nftStartId = nftStartId.add(1);
         nftCollection.mint(msg.sender, nftStartId - 1);
 
-        emit Staked(msg.sender, rewardToken, nftStartId, amount, lockDays);
+        emit Staked(msg.sender, rewardToken, nftStartId - 1, amount, lockDays);
     }
-
-
 
     function withdraw(uint256 nftId) external {
         StakerInfo storage staker = stakes[nftId];
@@ -175,6 +173,8 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         pool.stakedAmount = pool.stakedAmount.sub(staker.amount);
         pool.stakedAmountWithMultipliers = pool.stakedAmountWithMultipliers.sub(virtualAmount);
 
+        uint256 staked = staker.amount;
+
         // reset all staker props
         staker.rewardDebt = 0;
         staker.amount = 0;
@@ -183,10 +183,10 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         staker.nftId = 0;
         staker.rewardToken = address(0);
 
-        stakingToken.safeTransfer(msg.sender, reward.add(staker.amount));
+        stakingToken.safeTransfer(msg.sender, reward.add(staked));
 
         emit Harvest(msg.sender, address(staker.rewardToken), nftId, reward);
-        emit Withdraw(msg.sender, address(staker.rewardToken), nftId, staker.amount);
+        emit Withdraw(msg.sender, address(staker.rewardToken), nftId, staked);
     }
 
     function updateRewards(address rewardToken) private poolExists(rewardToken) {
@@ -248,7 +248,16 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         RewardPool memory pool = pools[address(staker.rewardToken)];
         require(address(pool.rewardToken) != address(0), "UnicStaking: Pool gone");
 
-        uint256 accumulated = virtualAmount(staker.amount, staker.multiplier).mul(pool.accRewardPerShare).div(DIV_PRECISION);
+        uint256 accRewardPerShare = 0;
+        // run a part from the updateRewards logic but don't persist anything
+        if (pool.totalRewardAmount > pool.lastRewardAmount) {
+            if (pool.stakedAmountWithMultipliers > 0) {
+                uint256 reward = pool.totalRewardAmount.sub(pool.lastRewardAmount);
+                accRewardPerShare = pool.accRewardPerShare.add(reward.mul(DIV_PRECISION).div(pool.stakedAmountWithMultipliers));
+            }
+        }
+
+        uint256 accumulated = virtualAmount(staker.amount, staker.multiplier).mul(accRewardPerShare).div(DIV_PRECISION);
         return accumulated.sub(staker.rewardDebt);
     }
 
