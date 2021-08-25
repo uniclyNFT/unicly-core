@@ -157,6 +157,58 @@ describe.only('UnicStaking', () => {
     expect(pendingRewardJon).to.equal('319');
   });
 
+  it('should only harvest one position', async () => {
+    await staking.createPool(uToken.address);
+    await staking.setMinStakeAmount(100);
+    await staking.setLockMultiplier(0, 100);
+
+    await unic.transfer(stakerHarold.address, 2000);
+    await unic.connect(stakerHarold).approve(staking.address, 2000);
+
+    const stakedHarold1 = await staking.connect(stakerHarold).stake(1000, 0, uToken.address);
+    const stakedHaroldReceipt1 = await stakedHarold1.wait();
+    const haroldEvent1 = stakedHaroldReceipt1.events.find((e: any) => e.event === 'Staked');
+    const haroldNftId1 = haroldEvent1.args.nftId;
+
+    const stakedHarold2 = await staking.connect(stakerHarold).stake(1000, 0, uToken.address);
+    const stakedHaroldReceipt2 = await stakedHarold2.wait();
+    const haroldEvent2 = stakedHaroldReceipt2.events.find((e: any) => e.event === 'Staked');
+    const haroldNftId2 = haroldEvent2.args.nftId;
+
+    await uToken.approve(staking.address, 1000);
+    await staking.addRewards(uToken.address, 1000);
+
+    const currentBlock = await provider.getBlock('latest')
+    await mineBlocks(provider, (currentBlock.timestamp + 1), currentBlock.number + 1);
+
+    const pendingRewardHarold1 = (await staking.pendingReward(haroldNftId1)).toString();
+    expect(pendingRewardHarold1).to.equal('500');
+
+    const pendingRewardHarold2 = (await staking.pendingReward(haroldNftId2)).toString();
+    expect(pendingRewardHarold2).to.equal('500');
+
+    // harold should not have any funds left after putting everything into staking
+    expect((await unic.balanceOf(stakerHarold.address)).toString()).to.equal('0');
+    // also harold should not have any uTokens (rewards)
+    expect((await uToken.balanceOf(stakerHarold.address)).toString()).to.equal('0');
+
+    // now let's harvest only one position for harold
+    const harvested = await staking.connect(stakerHarold).harvest(haroldNftId1);
+    await harvested.wait();
+
+    // harold should now only have the harvested rewards as a balance
+    expect((await uToken.balanceOf(stakerHarold.address)).toString()).to.equal('500');
+
+    // pending reward should now be 0
+    expect((await staking.connect(stakerHarold).pendingReward(haroldNftId1)).toString()).to.equal('0');
+
+    await nftCollection.connect(stakerHarold).approve(staking.address, haroldNftId1);
+    const withdraw = await staking.connect(stakerHarold).withdraw(haroldNftId1);
+    await withdraw.wait();
+
+    expect((await unic.balanceOf(stakerHarold.address)).toString()).to.equal('1000');
+  });
+
   it('should return funds on withdrawal', async () => {
     await staking.createPool(uToken.address);
     await staking.setMinStakeAmount(100);
@@ -185,5 +237,35 @@ describe.only('UnicStaking', () => {
 
     balance = (await unic.balanceOf(stakerJon.address)).toString();
     expect(balance).to.equal('1000');
+  });
+
+  it('should fix bug ["reverted: ERC20: transfer amount exceeds balance when trying to withdraw"]', async () => {
+    await staking.createPool(uToken.address);
+    await staking.setMinStakeAmount(1);
+    await staking.setLockMultiplier(0, 100);
+    await unic.transfer(stakerJon.address, 2);
+
+    let balance = (await unic.balanceOf(stakerJon.address)).toString();
+    expect(balance).to.equal('2');
+
+    await unic.connect(stakerJon).approve(staking.address, 2);
+    const staked = await staking.connect(stakerJon).stake(2, 0, uToken.address);
+    const stakedReceipt = await staked.wait();
+    const stakedEvent = stakedReceipt.events.find((e: any) => e.event === 'Staked');
+    const stakingNftId = stakedEvent.args.nftId;
+
+    await uToken.approve(staking.address, 111);
+    await staking.addRewards(uToken.address, 10);
+    await staking.addRewards(uToken.address, 1);
+    await staking.addRewards(uToken.address, 100);
+
+    const currentBlock = await provider.getBlock('latest')
+    await mineBlocks(provider, (currentBlock.timestamp + 1), currentBlock.number + 1);
+
+    await staking.connect(stakerJon).harvest(stakingNftId);
+    expect((await uToken.balanceOf(stakerJon.address)).toString()).to.equal('111');
+
+    await nftCollection.connect(stakerJon).approve(staking.address, stakingNftId);
+    await staking.connect(stakerJon).withdraw(stakingNftId);
   });
 });

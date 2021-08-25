@@ -191,6 +191,8 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
 
     function updateRewards(address rewardToken) private poolExists(rewardToken) {
         RewardPool storage pool = pools[rewardToken];
+        require(address(pool.rewardToken) != address(0), "UnicStaking: Pool gone");
+
         if (pool.totalRewardAmount > pool.lastRewardAmount) {
             if (pool.stakedAmountWithMultipliers > 0) {
                 uint256 reward = pool.totalRewardAmount.sub(pool.lastRewardAmount);
@@ -228,16 +230,21 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
             nftCollection.ownerOf(nftId) == msg.sender,
             "UnicStaking: Only the owner may harvest"
         );
-        RewardPool memory pool = pools[address(staker.rewardToken)];
-        require(address(pool.rewardToken) != address(0), "UnicStaking: Pool gone");
 
         updateRewards(address(staker.rewardToken));
 
+        RewardPool memory pool = pools[address(staker.rewardToken)];
         uint256 accumulated = virtualAmount(staker.amount, staker.multiplier).mul(pool.accRewardPerShare).div(DIV_PRECISION);
-        uint256 reward = accumulated.sub(staker.rewardDebt);
+
+        uint256 reward;
+        // this needs to be considered due to roundings in reward calculation
+        if (accumulated > staker.rewardDebt) {
+            reward = accumulated.sub(staker.rewardDebt);
+        }
+
         staker.rewardDebt = accumulated;
 
-        stakingToken.safeTransfer(msg.sender, reward);
+        pool.rewardToken.safeTransfer(msg.sender, reward);
         emit Harvest(msg.sender, address(staker.rewardToken), nftId, reward);
     }
 
@@ -258,6 +265,11 @@ contract UnicStaking is EmergencyWithdrawable, IRewardable {
         }
 
         uint256 accumulated = virtualAmount(staker.amount, staker.multiplier).mul(accRewardPerShare).div(DIV_PRECISION);
+
+        // this can happen due to roundings in the reward calculation
+        if (staker.rewardDebt > accumulated) {
+            return 0;
+        }
         return accumulated.sub(staker.rewardDebt);
     }
 
