@@ -5,8 +5,8 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "./interfaces/IUnicFarm.sol";
-import "./interfaces/IUnicGallery.sol";
+import "./UnicSwap/interfaces/IUnicFarm.sol";
+import "./UnicSwap/interfaces/IUnicGallery.sol";
 
 contract UniclyXUnicVault is OwnableUpgradeable {
     using SafeMath for uint256;
